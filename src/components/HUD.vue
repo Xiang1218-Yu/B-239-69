@@ -9,7 +9,7 @@
           <div class="flex items-center space-x-2">
             <div class="text-sm text-military-light">HP</div>
             <div class="w-40 h-6 bg-military-dark border-2 border-military-green rounded overflow-hidden">
-              <div 
+              <div
                 class="h-full transition-all duration-300"
                 :class="healthColor"
                 :style="{ width: health + '%' }"
@@ -17,7 +17,7 @@
             </div>
             <div class="text-lg hud-text font-bold">{{ health }}</div>
           </div>
-          
+
           <!-- 弹药 -->
           <div class="flex items-center space-x-2">
             <div class="text-sm text-military-light">AMMO</div>
@@ -25,11 +25,26 @@
           </div>
         </div>
       </div>
-      
+
       <!-- 右侧分数 -->
       <div class="hud-panel p-4 pointer-events-auto">
-        <div class="text-sm text-military-light mb-1">SCORE</div>
-        <div class="text-3xl hud-text font-bold">{{ score }}</div>
+        <div class="flex space-x-6">
+          <!-- 分数 -->
+          <div class="text-center">
+            <div class="text-sm text-military-light mb-1">SCORE</div>
+            <div class="text-3xl hud-text font-bold">{{ score }}</div>
+          </div>
+          <!-- 击杀数 -->
+          <div class="text-center border-l border-military-green pl-6">
+            <div class="text-sm text-military-light mb-1">KILLS</div>
+            <div class="text-2xl hud-text font-bold text-red-400">{{ enemiesKilled }}</div>
+          </div>
+          <!-- 摧毁目标 -->
+          <div class="text-center border-l border-military-green pl-6">
+            <div class="text-sm text-military-light mb-1">TARGETS</div>
+            <div class="text-2xl hud-text font-bold text-yellow-400">{{ targetsDestroyed }}</div>
+          </div>
+        </div>
       </div>
     </div>
     
@@ -71,6 +86,8 @@ const props = defineProps<{
 const health = ref(100)
 const ammo = ref(30)
 const score = ref(0)
+const enemiesKilled = ref(0)
+const targetsDestroyed = ref(0)
 
 const healthColor = computed(() => {
   if (health.value > 60) return 'bg-green-500'
@@ -86,6 +103,8 @@ onMounted(() => {
       health.value = props.game.health
       ammo.value = props.game.ammo
       score.value = props.game.score
+      enemiesKilled.value = props.game.enemiesKilled
+      targetsDestroyed.value = props.game.targetsDestroyed
     }
   }, 100)
 })

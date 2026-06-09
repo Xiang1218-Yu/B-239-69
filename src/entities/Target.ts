@@ -4,13 +4,16 @@ import * as CANNON from 'cannon-es'
 export class Target {
   public mesh: THREE.Mesh
   public body: CANNON.Body
+  public scoreValue: number = 100
   private destroyed: boolean = false
-  
+
   constructor(
-    scene: THREE.Scene, 
-    world: CANNON.World, 
-    position: { x: number, y: number, z: number }
+    scene: THREE.Scene,
+    world: CANNON.World,
+    position: { x: number; y: number; z: number },
+    scoreValue: number = 100
   ) {
+    this.scoreValue = scoreValue
     // 创建木箱外观
     const geometry = new THREE.BoxGeometry(2, 2, 2)
     const material = new THREE.MeshStandardMaterial({

@@ -9,17 +9,23 @@ export class Projectile {
   private trail: THREE.Line | null = null
   private trailPoints: THREE.Vector3[] = []
   
+  private projectileColor: number
+
   constructor(
     scene: THREE.Scene,
     world: CANNON.World,
     position: THREE.Vector3,
-    direction: THREE.Vector3
+    direction: THREE.Vector3,
+    color: number = 0xffb82e
   ) {
+    this.projectileColor = color
+
     // 创建炮弹网格
     const geometry = new THREE.SphereGeometry(0.15, 8, 8)
+    const emissiveColor = color === 0xff3333 ? 0xff0000 : 0xff8800
     const material = new THREE.MeshStandardMaterial({
-      color: 0xffb82e,
-      emissive: 0xff8800,
+      color: color,
+      emissive: emissiveColor,
       emissiveIntensity: 0.8,
       metalness: 0.8,
       roughness: 0.2
@@ -28,9 +34,9 @@ export class Projectile {
     this.mesh.position.copy(position)
     this.mesh.castShadow = true
     scene.add(this.mesh)
-    
+
     // 添加光晕效果
-    const light = new THREE.PointLight(0xffb82e, 2, 10)
+    const light = new THREE.PointLight(color, 2, 10)
     this.mesh.add(light)
     
     // 创建物理体
@@ -59,11 +65,11 @@ export class Projectile {
   private createTrail(scene: THREE.Scene): void {
     const geometry = new THREE.BufferGeometry()
     const material = new THREE.LineBasicMaterial({
-      color: 0xffb82e,
+      color: this.projectileColor,
       transparent: true,
       opacity: 0.6
     })
-    
+
     this.trail = new THREE.Line(geometry, material)
     scene.add(this.trail)
   }

@@ -6,28 +6,36 @@ import { InputSystem } from '../systems/InputSystem'
 import { CameraSystem } from '../systems/CameraSystem'
 import { Projectile } from '../entities/Projectile'
 import { Target } from '../entities/Target'
+import { Enemy } from '../entities/Enemy'
 
 export class Game {
   public scene: THREE.Scene
   public camera: THREE.PerspectiveCamera
   public renderer: THREE.WebGLRenderer
   public world: CANNON.World
-  
+
   public playerTank: Tank | null = null
   public terrain: Terrain | null = null
   public projectiles: Projectile[] = []
   public targets: Target[] = []
-  
+  public enemies: Enemy[] = []
+  public enemyProjectiles: Projectile[] = []
+
   public inputSystem: InputSystem
   public cameraSystem: CameraSystem
-  
+
   private clock: THREE.Clock
   private animationId: number | null = null
-  
+  private enemySpawnTimer: number = 0
+  private enemySpawnInterval: number = 10
+  private maxEnemies: number = 5
+
   // 游戏状态
   public health: number = 100
   public ammo: number = 30
   public score: number = 0
+  public enemiesKilled: number = 0
+  public targetsDestroyed: number = 0
   public isRunning: boolean = false
 
   constructor(canvas: HTMLCanvasElement) {
@@ -135,21 +143,38 @@ export class Game {
   public async init(): Promise<void> {
     // 创建地形
     this.terrain = new Terrain(this.scene, this.world)
-    
+
     // 创建玩家坦克（在地面上方稍微一点）
     this.playerTank = new Tank(this.scene, this.world, { x: 0, y: 1, z: 0 })
-    
-    // 创建目标木箱（在玩家前方分散放置）
-    this.targets.push(new Target(this.scene, this.world, { x: 10, y: 1, z: -5 }))
-    this.targets.push(new Target(this.scene, this.world, { x: -8, y: 1, z: -10 }))
-    this.targets.push(new Target(this.scene, this.world, { x: 15, y: 1, z: 8 }))
-    this.targets.push(new Target(this.scene, this.world, { x: -12, y: 1, z: 5 }))
-    this.targets.push(new Target(this.scene, this.world, { x: 0, y: 1, z: -15 }))
-    
+
+    // 创建目标木箱（在玩家前方分散放置），不同位置不同分数
+    this.targets.push(new Target(this.scene, this.world, { x: 10, y: 1, z: -5 }, 100))
+    this.targets.push(new Target(this.scene, this.world, { x: -8, y: 1, z: -10 }, 100))
+    this.targets.push(new Target(this.scene, this.world, { x: 15, y: 1, z: 8 }, 150))
+    this.targets.push(new Target(this.scene, this.world, { x: -12, y: 1, z: 5 }, 150))
+    this.targets.push(new Target(this.scene, this.world, { x: 0, y: 1, z: -15 }, 200))
+
+    // 创建初始AI敌人
+    this.spawnEnemy(25, 25)
+    this.spawnEnemy(-25, 25)
+    this.spawnEnemy(25, -25)
+
     // 设置相机跟随
     this.cameraSystem.setTarget(this.playerTank.mesh)
-    
+
     console.log('游戏初始化完成')
+  }
+
+  private spawnEnemy(minDistance: number = 20, maxDistance: number = 40): void {
+    if (this.enemies.length >= this.maxEnemies) return
+
+    const angle = Math.random() * Math.PI * 2
+    const distance = minDistance + Math.random() * (maxDistance - minDistance)
+    const x = Math.cos(angle) * distance
+    const z = Math.sin(angle) * distance
+
+    const enemy = new Enemy(this.scene, this.world, { x, y: 1, z })
+    this.enemies.push(enemy)
   }
   
   public restart(): void {
@@ -157,26 +182,46 @@ export class Game {
     this.health = 100
     this.ammo = 30
     this.score = 0
-    
-    // 清除所有炮弹
+    this.enemiesKilled = 0
+    this.targetsDestroyed = 0
+    this.enemySpawnTimer = 0
+
+    // 清除所有玩家炮弹
     this.projectiles.forEach(projectile => {
       projectile.destroy(this.scene, this.world)
     })
     this.projectiles = []
-    
+
+    // 清除所有敌人炮弹
+    this.enemyProjectiles.forEach(projectile => {
+      projectile.destroy(this.scene, this.world)
+    })
+    this.enemyProjectiles = []
+
     // 清除所有目标
     this.targets.forEach(target => {
       target.destroy(this.scene, this.world)
     })
     this.targets = []
-    
+
+    // 清除所有敌人
+    this.enemies.forEach(enemy => {
+      enemy.destroy(this.scene, this.world)
+    })
+    this.enemies = []
+
     // 重新创建目标
-    this.targets.push(new Target(this.scene, this.world, { x: 10, y: 1, z: -5 }))
-    this.targets.push(new Target(this.scene, this.world, { x: -8, y: 1, z: -10 }))
-    this.targets.push(new Target(this.scene, this.world, { x: 15, y: 1, z: 8 }))
-    this.targets.push(new Target(this.scene, this.world, { x: -12, y: 1, z: 5 }))
-    this.targets.push(new Target(this.scene, this.world, { x: 0, y: 1, z: -15 }))
-    
+    this.targets.push(new Target(this.scene, this.world, { x: 10, y: 1, z: -5 }, 100))
+    this.targets.push(new Target(this.scene, this.world, { x: -8, y: 1, z: -10 }, 100))
+    this.targets.push(new Target(this.scene, this.world, { x: 15, y: 1, z: 8 }, 150))
+    this.targets.push(new Target(this.scene, this.world, { x: -12, y: 1, z: 5 }, 150))
+    this.targets.push(new Target(this.scene, this.world, { x: 0, y: 1, z: -15 }, 200))
+
+    // 重新创建敌人
+    this.spawnEnemy(25, 25)
+    this.spawnEnemy(-25, 25)
+    this.spawnEnemy(25, -25)
+
     // 重置坦克位置
     if (this.playerTank) {
       this.playerTank.body.position.set(0, 1, 0)
@@ -184,7 +229,7 @@ export class Game {
       this.playerTank.body.angularVelocity.set(0, 0, 0)
       this.playerTank.body.quaternion.set(0, 0, 0, 1)
     }
-    
+
     console.log('游戏重新开始')
   }
   
@@ -203,43 +248,73 @@ export class Game {
   
   private animate(): void {
     if (!this.isRunning) return
-    
+
     this.animationId = requestAnimationFrame(this.animate.bind(this))
-    
-    const deltaTime = this.clock.getDelta()
-    const elapsedTime = this.clock.getElapsedTime()
-    
+
+    const deltaTime = Math.min(this.clock.getDelta(), 0.1)
+
     // 更新物理世界
     this.world.step(1 / 60, deltaTime, 3)
-    
+
+    const playerPosition = this.playerTank ? this.playerTank.mesh.position : null
+
     // 更新玩家坦克
     if (this.playerTank) {
       const input = this.inputSystem.getInput()
       this.playerTank.update(deltaTime, input)
-      
+
       // 射击
       if (input.shoot && this.ammo > 0) {
         this.shoot()
       }
     }
-    
-    // 更新炮弹
-    this.projectiles = this.projectiles.filter(projectile => {
+
+    // 更新敌人AI和行为
+    this.enemies.forEach((enemy) => {
+      enemy.update(deltaTime, playerPosition, this.camera)
+
+      // 敌人射击
+      if (enemy.canShoot() && playerPosition) {
+        const shootPos = enemy.getShootPosition()
+        const shootDir = enemy.getShootDirection()
+        const enemyProjectile = new Projectile(this.scene, this.world, shootPos, shootDir, 0xff3333)
+        this.enemyProjectiles.push(enemyProjectile)
+      }
+    })
+
+    // 更新玩家炮弹并检测碰撞
+    this.projectiles = this.projectiles.filter((projectile) => {
       projectile.update(deltaTime)
-      
-      // 检查是否击中目标
-      for (let i = 0; i < this.targets.length; i++) {
+
+      // 检查是否击中目标木箱
+      for (let i = this.targets.length - 1; i >= 0; i--) {
         const target = this.targets[i]
         if (target.checkHit(projectile.mesh.position)) {
-          // 击中！
           target.destroy(this.scene, this.world)
           this.targets.splice(i, 1)
           projectile.destroy(this.scene, this.world)
-          this.score += 100  // 增加分数
+          this.score += target.scoreValue
+          this.targetsDestroyed++
           return false
         }
       }
-      
+
+      // 检查是否击中敌人
+      for (let i = this.enemies.length - 1; i >= 0; i--) {
+        const enemy = this.enemies[i]
+        if (enemy.checkHit(projectile.mesh.position)) {
+          const isDead = enemy.takeDamage(50)
+          projectile.destroy(this.scene, this.world)
+          if (isDead) {
+            enemy.destroy(this.scene, this.world)
+            this.enemies.splice(i, 1)
+            this.score += enemy.scoreValue
+            this.enemiesKilled++
+          }
+          return false
+        }
+      }
+
       // 检查炮弹是否超时
       if (projectile.shouldRemove()) {
         projectile.destroy(this.scene, this.world)
@@ -247,15 +322,54 @@ export class Game {
       }
       return true
     })
-    
-    // 更新目标
-    this.targets.forEach(target => {
+
+    // 更新敌人炮弹并检测碰撞
+    this.enemyProjectiles = this.enemyProjectiles.filter((projectile) => {
+      projectile.update(deltaTime)
+
+      // 检查是否击中玩家
+      if (this.playerTank) {
+        const distance = this.playerTank.mesh.position.distanceTo(projectile.mesh.position)
+        if (distance < 2) {
+          projectile.destroy(this.scene, this.world)
+          this.health -= 10
+          if (this.health <= 0) {
+            this.health = 0
+          }
+          return false
+        }
+      }
+
+      // 检查炮弹是否超时
+      if (projectile.shouldRemove()) {
+        projectile.destroy(this.scene, this.world)
+        return false
+      }
+      return true
+    })
+
+    // 更新目标木箱
+    this.targets.forEach((target) => {
       target.update()
     })
-    
+
+    // 定时生成新敌人
+    this.enemySpawnTimer += deltaTime
+    if (this.enemySpawnTimer > this.enemySpawnInterval) {
+      this.enemySpawnTimer = 0
+      this.spawnEnemy(30, 50)
+    }
+
+    // 当目标全部被摧毁时，补充新目标
+    if (this.targets.length === 0) {
+      this.targets.push(new Target(this.scene, this.world, { x: 10 + Math.random() * 10, y: 1, z: -5 - Math.random() * 10 }, 100))
+      this.targets.push(new Target(this.scene, this.world, { x: -8 - Math.random() * 10, y: 1, z: -10 - Math.random() * 10 }, 150))
+      this.targets.push(new Target(this.scene, this.world, { x: 15 + Math.random() * 10, y: 1, z: 8 + Math.random() * 10 }, 200))
+    }
+
     // 更新相机
     this.cameraSystem.update(deltaTime)
-    
+
     // 渲染
     this.renderer.render(this.scene, this.camera)
   }
