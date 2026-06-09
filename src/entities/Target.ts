@@ -48,10 +48,11 @@ export class Target {
   
   public checkHit(projectilePosition: THREE.Vector3): boolean {
     if (this.destroyed) return false
-    
-    // 简单的距离检测
-    const distance = this.mesh.position.distanceTo(projectilePosition)
-    return distance < 1.5 // 如果炮弹在1.5米内就算击中
+
+    const dx = this.mesh.position.x - projectilePosition.x
+    const dy = this.mesh.position.y - projectilePosition.y
+    const dz = this.mesh.position.z - projectilePosition.z
+    return dx * dx + dy * dy + dz * dz < 2.25
   }
   
   public destroy(scene: THREE.Scene, world: CANNON.World): void {

@@ -24,6 +24,11 @@ export class Enemy {
   private wanderTimer: number = 0
   private wanderInterval: number = 3
 
+  private tempDirection: THREE.Vector3
+  private tempForward: THREE.Vector3
+  private tempTurretDirection: THREE.Vector3
+  private tempTurretForward: THREE.Vector3
+
   constructor(
     scene: THREE.Scene,
     world: CANNON.World,
@@ -31,6 +36,10 @@ export class Enemy {
   ) {
     this.mesh = new THREE.Group()
     this.targetPosition = new THREE.Vector3()
+    this.tempDirection = new THREE.Vector3()
+    this.tempForward = new THREE.Vector3()
+    this.tempTurretDirection = new THREE.Vector3()
+    this.tempTurretForward = new THREE.Vector3()
 
     const hullGeometry = new THREE.BoxGeometry(3, 1.5, 4)
     const hullMaterial = new THREE.MeshStandardMaterial({
@@ -155,7 +164,7 @@ export class Enemy {
     let chasePlayer = false
 
     if (playerPosition && distanceToPlayer < 40) {
-      moveTarget = playerPosition.clone()
+      moveTarget = playerPosition
       chasePlayer = true
     } else {
       this.wanderTimer += deltaTime
@@ -166,16 +175,15 @@ export class Enemy {
       moveTarget = this.targetPosition
     }
 
-    const direction = new THREE.Vector3()
-    direction.subVectors(moveTarget, this.mesh.position)
-    direction.y = 0
-    direction.normalize()
+    this.tempDirection.subVectors(moveTarget, this.mesh.position)
+    this.tempDirection.y = 0
+    this.tempDirection.normalize()
 
-    const forward = new THREE.Vector3(0, 0, -1)
-    forward.applyQuaternion(this.mesh.quaternion)
+    this.tempForward.set(0, 0, -1)
+    this.tempForward.applyQuaternion(this.mesh.quaternion)
 
-    const angleToTarget = Math.atan2(direction.x, direction.z)
-    const currentAngle = Math.atan2(forward.x, forward.z)
+    const angleToTarget = Math.atan2(this.tempDirection.x, this.tempDirection.z)
+    const currentAngle = Math.atan2(this.tempForward.x, this.tempForward.z)
     let angleDiff = angleToTarget - currentAngle
 
     while (angleDiff > Math.PI) angleDiff -= Math.PI * 2
@@ -189,24 +197,23 @@ export class Enemy {
 
     if (Math.abs(angleDiff) < 0.5) {
       const moveSpeed = chasePlayer ? this.speed : this.speed * 0.6
-      this.body.velocity.x = forward.x * moveSpeed
-      this.body.velocity.z = forward.z * moveSpeed
+      this.body.velocity.x = this.tempForward.x * moveSpeed
+      this.body.velocity.z = this.tempForward.z * moveSpeed
     } else {
       this.body.velocity.x = 0
       this.body.velocity.z = 0
     }
 
     if (playerPosition) {
-      const turretDirection = new THREE.Vector3()
-      turretDirection.subVectors(playerPosition, this.mesh.position)
-      turretDirection.y = 0
-      turretDirection.normalize()
+      this.tempTurretDirection.subVectors(playerPosition, this.mesh.position)
+      this.tempTurretDirection.y = 0
+      this.tempTurretDirection.normalize()
 
-      const turretForward = new THREE.Vector3(1, 0, 0)
-      turretForward.applyQuaternion(this.turret.quaternion)
+      this.tempTurretForward.set(1, 0, 0)
+      this.tempTurretForward.applyQuaternion(this.turret.quaternion)
 
-      const turretAngleToTarget = Math.atan2(turretDirection.z, turretDirection.x)
-      const turretCurrentAngle = Math.atan2(turretForward.z, turretForward.x)
+      const turretAngleToTarget = Math.atan2(this.tempTurretDirection.z, this.tempTurretDirection.x)
+      const turretCurrentAngle = Math.atan2(this.tempTurretForward.z, this.tempTurretForward.x)
       let turretAngleDiff = turretAngleToTarget - turretCurrentAngle
 
       while (turretAngleDiff > Math.PI) turretAngleDiff -= Math.PI * 2
@@ -217,9 +224,6 @@ export class Enemy {
     }
 
     this.shootCooldown -= deltaTime
-    if (chasePlayer && distanceToPlayer < 35 && this.shootCooldown <= 0) {
-      this.shootCooldown = this.shootInterval + Math.random() * 1
-    }
 
     this.mesh.position.copy(this.body.position as any)
     this.mesh.quaternion.copy(this.body.quaternion as any)
@@ -229,19 +233,21 @@ export class Enemy {
 
     const healthPercent = this.currentHealth / this.maxHealth
     this.healthBar.scale.x = healthPercent
+    const healthMat = this.healthBar.material as THREE.MeshBasicMaterial
     if (healthPercent > 0.5) {
-      ;(this.healthBar.material as THREE.MeshBasicMaterial).color.setHex(0x00ff00)
+      healthMat.color.setHex(0x00ff00)
     } else if (healthPercent > 0.25) {
-      ;(this.healthBar.material as THREE.MeshBasicMaterial).color.setHex(0xffff00)
+      healthMat.color.setHex(0xffff00)
     } else {
-      ;(this.healthBar.material as THREE.MeshBasicMaterial).color.setHex(0xff0000)
+      healthMat.color.setHex(0xff0000)
     }
   }
 
   public checkHit(projectilePosition: THREE.Vector3): boolean {
     if (this.destroyed) return false
-    const distance = this.mesh.position.distanceTo(projectilePosition)
-    return distance < 2
+    const dx = this.mesh.position.x - projectilePosition.x
+    const dz = this.mesh.position.z - projectilePosition.z
+    return dx * dx + dz * dz < 4
   }
 
   public takeDamage(damage: number): boolean {

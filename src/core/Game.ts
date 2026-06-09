@@ -253,134 +253,141 @@ export class Game {
 
     const deltaTime = Math.min(this.clock.getDelta(), 0.1)
 
-    // 更新物理世界
     this.world.step(1 / 60, deltaTime, 3)
 
     const playerPosition = this.playerTank ? this.playerTank.mesh.position : null
 
-    // 更新玩家坦克
     if (this.playerTank) {
       const input = this.inputSystem.getInput()
       this.playerTank.update(deltaTime, input)
 
-      // 射击
       if (input.shoot && this.ammo > 0) {
         this.shoot()
       }
     }
 
-    // 更新敌人AI和行为
-    this.enemies.forEach((enemy) => {
+    for (let ei = this.enemies.length - 1; ei >= 0; ei--) {
+      const enemy = this.enemies[ei]
       enemy.update(deltaTime, playerPosition, this.camera)
 
-      // 敌人射击
       if (enemy.canShoot() && playerPosition) {
         const shootPos = enemy.getShootPosition()
         const shootDir = enemy.getShootDirection()
         const enemyProjectile = new Projectile(this.scene, this.world, shootPos, shootDir, 0xff3333)
         this.enemyProjectiles.push(enemyProjectile)
       }
-    })
+    }
 
-    // 更新玩家炮弹并检测碰撞
-    this.projectiles = this.projectiles.filter((projectile) => {
+    const projPos = new THREE.Vector3()
+    for (let pi = this.projectiles.length - 1; pi >= 0; pi--) {
+      const projectile = this.projectiles[pi]
       projectile.update(deltaTime)
+      projPos.copy(projectile.mesh.position)
 
-      // 检查是否击中目标木箱
-      for (let i = this.targets.length - 1; i >= 0; i--) {
-        const target = this.targets[i]
-        if (target.checkHit(projectile.mesh.position)) {
+      let hitSomething = false
+
+      for (let ti = this.targets.length - 1; ti >= 0; ti--) {
+        const target = this.targets[ti]
+        if (target.checkHit(projPos)) {
           target.destroy(this.scene, this.world)
-          this.targets.splice(i, 1)
+          this.targets.splice(ti, 1)
           projectile.destroy(this.scene, this.world)
+          this.projectiles.splice(pi, 1)
           this.score += target.scoreValue
           this.targetsDestroyed++
-          return false
+          hitSomething = true
+          break
         }
       }
 
-      // 检查是否击中敌人
-      for (let i = this.enemies.length - 1; i >= 0; i--) {
-        const enemy = this.enemies[i]
-        if (enemy.checkHit(projectile.mesh.position)) {
-          const isDead = enemy.takeDamage(50)
-          projectile.destroy(this.scene, this.world)
-          if (isDead) {
-            enemy.destroy(this.scene, this.world)
-            this.enemies.splice(i, 1)
-            this.score += enemy.scoreValue
-            this.enemiesKilled++
+      if (!hitSomething) {
+        for (let ei = this.enemies.length - 1; ei >= 0; ei--) {
+          const enemy = this.enemies[ei]
+          if (enemy.checkHit(projPos)) {
+            const isDead = enemy.takeDamage(50)
+            projectile.destroy(this.scene, this.world)
+            this.projectiles.splice(pi, 1)
+            if (isDead) {
+              enemy.destroy(this.scene, this.world)
+              this.enemies.splice(ei, 1)
+              this.score += enemy.scoreValue
+              this.enemiesKilled++
+            }
+            hitSomething = true
+            break
           }
-          return false
         }
       }
 
-      // 检查炮弹是否超时
-      if (projectile.shouldRemove()) {
+      if (!hitSomething && projectile.shouldRemove()) {
         projectile.destroy(this.scene, this.world)
-        return false
+        this.projectiles.splice(pi, 1)
       }
-      return true
-    })
+    }
 
-    // 更新敌人炮弹并检测碰撞
-    this.enemyProjectiles = this.enemyProjectiles.filter((projectile) => {
-      projectile.update(deltaTime)
+    if (this.playerTank) {
+      const tankPos = this.playerTank.mesh.position
+      for (let pi = this.enemyProjectiles.length - 1; pi >= 0; pi--) {
+        const projectile = this.enemyProjectiles[pi]
+        projectile.update(deltaTime)
 
-      // 检查是否击中玩家
-      if (this.playerTank) {
-        const distance = this.playerTank.mesh.position.distanceTo(projectile.mesh.position)
-        if (distance < 2) {
+        const dx = tankPos.x - projectile.mesh.position.x
+        const dz = tankPos.z - projectile.mesh.position.z
+        const distSq = dx * dx + dz * dz
+
+        if (distSq < 4) {
           projectile.destroy(this.scene, this.world)
+          this.enemyProjectiles.splice(pi, 1)
           this.health -= 10
-          if (this.health <= 0) {
-            this.health = 0
-          }
-          return false
+          if (this.health < 0) this.health = 0
+          continue
+        }
+
+        if (projectile.shouldRemove()) {
+          projectile.destroy(this.scene, this.world)
+          this.enemyProjectiles.splice(pi, 1)
         }
       }
-
-      // 检查炮弹是否超时
-      if (projectile.shouldRemove()) {
-        projectile.destroy(this.scene, this.world)
-        return false
+    } else {
+      for (let pi = this.enemyProjectiles.length - 1; pi >= 0; pi--) {
+        const projectile = this.enemyProjectiles[pi]
+        projectile.update(deltaTime)
+        if (projectile.shouldRemove()) {
+          projectile.destroy(this.scene, this.world)
+          this.enemyProjectiles.splice(pi, 1)
+        }
       }
-      return true
-    })
+    }
 
-    // 更新目标木箱
-    this.targets.forEach((target) => {
-      target.update()
-    })
+    for (let i = 0; i < this.targets.length; i++) {
+      this.targets[i].update()
+    }
 
-    // 定时生成新敌人
     this.enemySpawnTimer += deltaTime
     if (this.enemySpawnTimer > this.enemySpawnInterval) {
       this.enemySpawnTimer = 0
       this.spawnEnemy(30, 50)
     }
 
-    // 当目标全部被摧毁时，补充新目标
     if (this.targets.length === 0) {
       this.targets.push(new Target(this.scene, this.world, { x: 10 + Math.random() * 10, y: 1, z: -5 - Math.random() * 10 }, 100))
       this.targets.push(new Target(this.scene, this.world, { x: -8 - Math.random() * 10, y: 1, z: -10 - Math.random() * 10 }, 150))
       this.targets.push(new Target(this.scene, this.world, { x: 15 + Math.random() * 10, y: 1, z: 8 + Math.random() * 10 }, 200))
     }
 
-    // 更新相机
     this.cameraSystem.update(deltaTime)
 
-    // 渲染
     this.renderer.render(this.scene, this.camera)
   }
   
   public shoot(): void {
     if (!this.playerTank || this.ammo <= 0) return
-    
+
     this.ammo--
-    
+
     const projectile = this.playerTank.shoot(this.scene, this.world)
     if (projectile) {
+      projectile.enableTrail(this.scene)
       this.projectiles.push(projectile)
     }
   }
