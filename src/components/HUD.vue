@@ -30,6 +30,8 @@
       <div class="hud-panel p-4 pointer-events-auto">
         <div class="text-sm text-military-light mb-1">SCORE</div>
         <div class="text-3xl hud-text font-bold">{{ score }}</div>
+        <div class="text-xs text-military-light mt-2">敌人击杀</div>
+        <div class="text-xl hud-text font-bold">{{ enemiesKilled }} / {{ enemiesTotal }}</div>
       </div>
     </div>
     
@@ -71,6 +73,8 @@ const props = defineProps<{
 const health = ref(100)
 const ammo = ref(30)
 const score = ref(0)
+const enemiesKilled = ref(0)
+const enemiesTotal = ref(0)
 
 const healthColor = computed(() => {
   if (health.value > 60) return 'bg-green-500'
@@ -86,6 +90,8 @@ onMounted(() => {
       health.value = props.game.health
       ammo.value = props.game.ammo
       score.value = props.game.score
+      enemiesKilled.value = props.game.enemiesKilled
+      enemiesTotal.value = props.game.enemiesKilled + props.game.enemies.length
     }
   }, 100)
 })

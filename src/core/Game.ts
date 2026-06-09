@@ -6,6 +6,7 @@ import { InputSystem } from '../systems/InputSystem'
 import { CameraSystem } from '../systems/CameraSystem'
 import { Projectile } from '../entities/Projectile'
 import { Target } from '../entities/Target'
+import { Enemy } from '../entities/Enemy'
 
 export class Game {
   public scene: THREE.Scene
@@ -17,6 +18,8 @@ export class Game {
   public terrain: Terrain | null = null
   public projectiles: Projectile[] = []
   public targets: Target[] = []
+  public enemies: Enemy[] = []
+  public enemiesKilled: number = 0
   
   public inputSystem: InputSystem
   public cameraSystem: CameraSystem
@@ -146,10 +149,26 @@ export class Game {
     this.targets.push(new Target(this.scene, this.world, { x: -12, y: 1, z: 5 }))
     this.targets.push(new Target(this.scene, this.world, { x: 0, y: 1, z: -15 }))
     
+    // 创建 3D AI 敌人
+    this.spawnEnemies()
+    
     // 设置相机跟随
     this.cameraSystem.setTarget(this.playerTank.mesh)
     
     console.log('游戏初始化完成')
+  }
+  
+  private spawnEnemies(): void {
+    const spawnPoints = [
+      { x: 25, y: 1, z: -25 },
+      { x: -30, y: 1, z: -20 },
+      { x: 30, y: 1, z: 20 },
+      { x: -25, y: 1, z: 25 },
+      { x: 0, y: 1, z: -35 }
+    ]
+    spawnPoints.forEach(p => {
+      this.enemies.push(new Enemy(this.scene, this.world, p))
+    })
   }
   
   public restart(): void {
@@ -157,6 +176,7 @@ export class Game {
     this.health = 100
     this.ammo = 30
     this.score = 0
+    this.enemiesKilled = 0
     
     // 清除所有炮弹
     this.projectiles.forEach(projectile => {
@@ -170,12 +190,21 @@ export class Game {
     })
     this.targets = []
     
+    // 清除所有敌人
+    this.enemies.forEach(enemy => {
+      enemy.destroy(this.scene, this.world)
+    })
+    this.enemies = []
+    
     // 重新创建目标
     this.targets.push(new Target(this.scene, this.world, { x: 10, y: 1, z: -5 }))
     this.targets.push(new Target(this.scene, this.world, { x: -8, y: 1, z: -10 }))
     this.targets.push(new Target(this.scene, this.world, { x: 15, y: 1, z: 8 }))
     this.targets.push(new Target(this.scene, this.world, { x: -12, y: 1, z: 5 }))
     this.targets.push(new Target(this.scene, this.world, { x: 0, y: 1, z: -15 }))
+    
+    // 重新生成敌人
+    this.spawnEnemies()
     
     // 重置坦克位置
     if (this.playerTank) {
@@ -240,6 +269,26 @@ export class Game {
         }
       }
       
+      // 检查是否击中 AI 敌人
+      for (let i = 0; i < this.enemies.length; i++) {
+        const enemy = this.enemies[i]
+        if (enemy.checkHit(projectile.mesh.position)) {
+          const killed = enemy.takeDamage(50)
+          projectile.destroy(this.scene, this.world)
+          if (killed) {
+            // 击杀敌人
+            enemy.destroy(this.scene, this.world)
+            this.enemies.splice(i, 1)
+            this.score += 300
+            this.enemiesKilled += 1
+          } else {
+            // 命中但未击杀
+            this.score += 50
+          }
+          return false
+        }
+      }
+      
       // 检查炮弹是否超时
       if (projectile.shouldRemove()) {
         projectile.destroy(this.scene, this.world)
@@ -252,6 +301,14 @@ export class Game {
     this.targets.forEach(target => {
       target.update()
     })
+    
+    // 更新 AI 敌人
+    if (this.playerTank) {
+      const playerPos = this.playerTank.mesh.position
+      this.enemies.forEach(enemy => {
+        enemy.update(deltaTime, playerPos, this.camera)
+      })
+    }
     
     // 更新相机
     this.cameraSystem.update(deltaTime)
