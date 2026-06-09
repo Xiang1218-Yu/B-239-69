@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import * as CANNON from 'cannon-es'
+import { Projectile } from './Projectile'
 
 type EnemyState = 'patrol' | 'chase' | 'attack'
 
@@ -24,11 +25,17 @@ export class Enemy {
   private aiState: EnemyState = 'patrol'
   private moveSpeed: number = 4
   private detectRange: number = 35
-  private attackRange: number = 8
+  private attackRange: number = 18
   private patrolCenter: THREE.Vector3
   private patrolRadius: number = 12
   private patrolAngle: number = 0
   private animTime: number = 0
+
+  // 攻击参数
+  private attackCooldown: number = 0
+  private attackInterval: number = 2.0
+  private attackDamage: number = 10
+  private projectileSpeed: number = 35
 
   constructor(
     scene: THREE.Scene,
@@ -164,10 +171,19 @@ export class Enemy {
     oldMaterial.needsUpdate = true
   }
 
-  public update(deltaTime: number, playerPosition: THREE.Vector3, camera: THREE.Camera): void {
-    if (this.destroyed) return
+  public update(
+    deltaTime: number,
+    playerPosition: THREE.Vector3,
+    camera: THREE.Camera,
+    scene: THREE.Scene,
+    world: CANNON.World
+  ): Projectile | null {
+    if (this.destroyed) return null
 
     this.animTime += deltaTime
+    if (this.attackCooldown > 0) {
+      this.attackCooldown -= deltaTime
+    }
 
     // 同步网格与物理体
     this.mesh.position.set(
@@ -229,6 +245,54 @@ export class Enemy {
     // 血条始终面向相机
     this.healthBarBg.lookAt(camera.position)
     this.healthBarFg.lookAt(camera.position)
+
+    // 主动攻击：当处于攻击状态且冷却结束时发射炮弹
+    if (this.aiState === 'attack' && this.attackCooldown <= 0) {
+      this.attackCooldown = this.attackInterval
+      return this.fireProjectile(scene, world, playerPosition)
+    }
+
+    return null
+  }
+
+  /**
+   * 朝玩家方向发射炮弹
+   */
+  private fireProjectile(
+    scene: THREE.Scene,
+    world: CANNON.World,
+    playerPosition: THREE.Vector3
+  ): Projectile {
+    // 从胸口位置发射
+    const firePosition = this.mesh.position.clone()
+    firePosition.y += 2.0
+    // 朝玩家中心稍上方瞄准
+    const targetPos = playerPosition.clone()
+    targetPos.y += 1.0
+    const direction = new THREE.Vector3()
+      .subVectors(targetPos, firePosition)
+      .normalize()
+    // 略微前移以避免与自身物理体碰撞
+    firePosition.add(direction.clone().multiplyScalar(1.2))
+
+    const projectile = new Projectile(scene, world, firePosition, direction)
+    // 调整为敌方炮弹速度与外观
+    projectile.body.velocity.set(
+      direction.x * this.projectileSpeed,
+      direction.y * this.projectileSpeed,
+      direction.z * this.projectileSpeed
+    )
+    const mat = projectile.mesh.material as THREE.MeshStandardMaterial
+    mat.color.setHex(0xff3333)
+    mat.emissive.setHex(0xaa0000)
+    return projectile
+  }
+
+  /**
+   * 获取敌人攻击的伤害
+   */
+  public getAttackDamage(): number {
+    return this.attackDamage
   }
 
   public checkHit(projectilePosition: THREE.Vector3): boolean {

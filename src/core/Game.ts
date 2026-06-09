@@ -17,6 +17,7 @@ export class Game {
   public playerTank: Tank | null = null
   public terrain: Terrain | null = null
   public projectiles: Projectile[] = []
+  public enemyProjectiles: Projectile[] = []
   public targets: Target[] = []
   public enemies: Enemy[] = []
   public enemiesKilled: number = 0
@@ -184,6 +185,12 @@ export class Game {
     })
     this.projectiles = []
     
+    // 清除所有敌方炮弹
+    this.enemyProjectiles.forEach(projectile => {
+      projectile.destroy(this.scene, this.world)
+    })
+    this.enemyProjectiles = []
+    
     // 清除所有目标
     this.targets.forEach(target => {
       target.destroy(this.scene, this.world)
@@ -306,9 +313,38 @@ export class Game {
     if (this.playerTank) {
       const playerPos = this.playerTank.mesh.position
       this.enemies.forEach(enemy => {
-        enemy.update(deltaTime, playerPos, this.camera)
+        const enemyShot = enemy.update(deltaTime, playerPos, this.camera, this.scene, this.world)
+        if (enemyShot) {
+          // 用 userData 携带伤害值
+          ;(enemyShot as any).damage = enemy.getAttackDamage()
+          this.enemyProjectiles.push(enemyShot)
+        }
       })
     }
+    
+    // 更新敌方炮弹并检测对玩家的命中
+    this.enemyProjectiles = this.enemyProjectiles.filter(projectile => {
+      projectile.update(deltaTime)
+      
+      if (this.playerTank) {
+        const tankCenter = this.playerTank.mesh.position.clone()
+        tankCenter.y += 1.0
+        const distance = tankCenter.distanceTo(projectile.mesh.position)
+        if (distance < 2.5) {
+          // 命中玩家
+          const damage = (projectile as any).damage ?? 10
+          this.health = Math.max(0, this.health - damage)
+          projectile.destroy(this.scene, this.world)
+          return false
+        }
+      }
+      
+      if (projectile.shouldRemove()) {
+        projectile.destroy(this.scene, this.world)
+        return false
+      }
+      return true
+    })
     
     // 更新相机
     this.cameraSystem.update(deltaTime)
