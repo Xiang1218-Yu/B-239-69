@@ -4,13 +4,16 @@ import * as CANNON from 'cannon-es'
 export class Target {
   public mesh: THREE.Mesh
   public body: CANNON.Body
+  public scoreValue: number = 100
   private destroyed: boolean = false
-  
+
   constructor(
-    scene: THREE.Scene, 
-    world: CANNON.World, 
-    position: { x: number, y: number, z: number }
+    scene: THREE.Scene,
+    world: CANNON.World,
+    position: { x: number; y: number; z: number },
+    scoreValue: number = 100
   ) {
+    this.scoreValue = scoreValue
     // 创建木箱外观
     const geometry = new THREE.BoxGeometry(2, 2, 2)
     const material = new THREE.MeshStandardMaterial({
@@ -45,10 +48,11 @@ export class Target {
   
   public checkHit(projectilePosition: THREE.Vector3): boolean {
     if (this.destroyed) return false
-    
-    // 简单的距离检测
-    const distance = this.mesh.position.distanceTo(projectilePosition)
-    return distance < 1.5 // 如果炮弹在1.5米内就算击中
+
+    const dx = this.mesh.position.x - projectilePosition.x
+    const dy = this.mesh.position.y - projectilePosition.y
+    const dz = this.mesh.position.z - projectilePosition.z
+    return dx * dx + dy * dy + dz * dz < 2.25
   }
   
   public destroy(scene: THREE.Scene, world: CANNON.World): void {
