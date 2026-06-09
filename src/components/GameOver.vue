@@ -5,23 +5,35 @@
     style="pointer-events: auto;"
   >
     <div class="text-center">
-      <!-- 标题 -->
       <div class="text-6xl hud-text font-black mb-8 loading-text">
         {{ title }}
       </div>
       
-      <!-- 提示信息 -->
-      <div class="text-2xl text-military-light mb-12">
+      <div class="text-2xl text-military-light mb-4">
         {{ message }}
       </div>
+
+      <div class="hud-panel p-6 inline-block mb-8">
+        <div class="grid grid-cols-2 gap-6">
+          <div>
+            <div class="text-sm text-military-light mb-1">最终得分</div>
+            <div class="text-4xl hud-text font-bold">{{ score }}</div>
+          </div>
+          <div>
+            <div class="text-sm text-military-light mb-1">击杀数</div>
+            <div class="text-4xl hud-text font-bold text-red-400">{{ killCount }}</div>
+          </div>
+        </div>
+      </div>
       
-      <!-- 重新开始按钮 -->
-      <button 
-        @click="handleRestart"
-        class="restart-button px-16 py-5 text-3xl font-bold tracking-wider"
-      >
-        重新开始
-      </button>
+      <div>
+        <button 
+          @click="handleRestart"
+          class="restart-button px-16 py-5 text-3xl font-bold tracking-wider"
+        >
+          重新开始
+        </button>
+      </div>
     </div>
   </div>
 </template>
@@ -32,6 +44,8 @@ import { computed } from 'vue'
 const props = defineProps<{
   show: boolean
   reason: 'ammo' | 'health' | null
+  score: number
+  killCount: number
 }>()
 
 const emit = defineEmits<{
@@ -46,7 +60,7 @@ const title = computed(() => {
 
 const message = computed(() => {
   if (props.reason === 'ammo') return '你的弹药已经用完了！'
-  if (props.reason === 'health') return '你的坦克被摧毁了！'
+  if (props.reason === 'health') return '你的坦克被敌人摧毁了！'
   return ''
 })
 

@@ -7,6 +7,8 @@
       v-if="gameStarted && gameReady"
       :show="showGameOver" 
       :reason="gameOverReason" 
+      :score="finalScore"
+      :killCount="finalKillCount"
       @restart="restartGame" 
     />
   </div>
@@ -25,6 +27,10 @@ const gameReady = ref(false)
 const game = ref<Game | null>(null)
 const showGameOver = ref(false)
 const gameOverReason = ref<'ammo' | 'health' | null>(null)
+const finalScore = ref(0)
+const finalKillCount = ref(0)
+
+let monitoringInterval: number | null = null
 
 const startGame = () => {
   gameStarted.value = true
@@ -34,21 +40,22 @@ const onGameReady = (gameInstance: Game) => {
   game.value = gameInstance
   gameReady.value = true
   
-  // 监控弹药和生命值
   startMonitoring()
 }
 
 const startMonitoring = () => {
-  setInterval(() => {
+  monitoringInterval = window.setInterval(() => {
     if (game.value && !showGameOver.value) {
-      // 检查弹药
-      if (game.value.ammo <= 0) {
+      if (game.value.ammo <= 0 && game.value.projectiles.filter(p => !p.isEnemyProjectile).length === 0) {
         gameOverReason.value = 'ammo'
+        finalScore.value = game.value.score
+        finalKillCount.value = game.value.killCount
         showGameOver.value = true
       }
-      // 检查生命值
       if (game.value.health <= 0) {
         gameOverReason.value = 'health'
+        finalScore.value = game.value.score
+        finalKillCount.value = game.value.killCount
         showGameOver.value = true
       }
     }
@@ -60,6 +67,8 @@ const restartGame = () => {
     game.value.restart()
     showGameOver.value = false
     gameOverReason.value = null
+    finalScore.value = 0
+    finalKillCount.value = 0
   }
 }
 </script>
