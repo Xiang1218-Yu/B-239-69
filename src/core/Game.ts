@@ -6,6 +6,7 @@ import { InputSystem } from '../systems/InputSystem'
 import { CameraSystem } from '../systems/CameraSystem'
 import { Projectile } from '../entities/Projectile'
 import { Target } from '../entities/Target'
+import { EnemyTank } from '../entities/EnemyTank'
 
 export class Game {
   public scene: THREE.Scene
@@ -17,6 +18,8 @@ export class Game {
   public terrain: Terrain | null = null
   public projectiles: Projectile[] = []
   public targets: Target[] = []
+  public enemies: EnemyTank[] = []
+  public enemyProjectiles: Projectile[] = []
   
   public inputSystem: InputSystem
   public cameraSystem: CameraSystem
@@ -146,6 +149,11 @@ export class Game {
     this.targets.push(new Target(this.scene, this.world, { x: -12, y: 1, z: 5 }))
     this.targets.push(new Target(this.scene, this.world, { x: 0, y: 1, z: -15 }))
     
+    // 创建 AI 敌人坦克
+    this.enemies.push(new EnemyTank(this.scene, this.world, { x: 35, y: 1, z: -35 }))
+    this.enemies.push(new EnemyTank(this.scene, this.world, { x: -40, y: 1, z: -30 }))
+    this.enemies.push(new EnemyTank(this.scene, this.world, { x: 30, y: 1, z: 40 }))
+    
     // 设置相机跟随
     this.cameraSystem.setTarget(this.playerTank.mesh)
     
@@ -158,11 +166,17 @@ export class Game {
     this.ammo = 30
     this.score = 0
     
-    // 清除所有炮弹
+    // 清除所有玩家炮弹
     this.projectiles.forEach(projectile => {
       projectile.destroy(this.scene, this.world)
     })
     this.projectiles = []
+    
+    // 清除所有敌人炮弹
+    this.enemyProjectiles.forEach(projectile => {
+      projectile.destroy(this.scene, this.world)
+    })
+    this.enemyProjectiles = []
     
     // 清除所有目标
     this.targets.forEach(target => {
@@ -170,12 +184,23 @@ export class Game {
     })
     this.targets = []
     
+    // 清除所有敌人
+    this.enemies.forEach(enemy => {
+      enemy.destroy(this.scene, this.world)
+    })
+    this.enemies = []
+    
     // 重新创建目标
     this.targets.push(new Target(this.scene, this.world, { x: 10, y: 1, z: -5 }))
     this.targets.push(new Target(this.scene, this.world, { x: -8, y: 1, z: -10 }))
     this.targets.push(new Target(this.scene, this.world, { x: 15, y: 1, z: 8 }))
     this.targets.push(new Target(this.scene, this.world, { x: -12, y: 1, z: 5 }))
     this.targets.push(new Target(this.scene, this.world, { x: 0, y: 1, z: -15 }))
+    
+    // 重新创建 AI 敌人坦克
+    this.enemies.push(new EnemyTank(this.scene, this.world, { x: 35, y: 1, z: -35 }))
+    this.enemies.push(new EnemyTank(this.scene, this.world, { x: -40, y: 1, z: -30 }))
+    this.enemies.push(new EnemyTank(this.scene, this.world, { x: 30, y: 1, z: 40 }))
     
     // 重置坦克位置
     if (this.playerTank) {
@@ -223,7 +248,7 @@ export class Game {
       }
     }
     
-    // 更新炮弹
+    // 更新玩家炮弹
     this.projectiles = this.projectiles.filter(projectile => {
       projectile.update(deltaTime)
       
@@ -231,11 +256,61 @@ export class Game {
       for (let i = 0; i < this.targets.length; i++) {
         const target = this.targets[i]
         if (target.checkHit(projectile.mesh.position)) {
-          // 击中！
           target.destroy(this.scene, this.world)
           this.targets.splice(i, 1)
           projectile.destroy(this.scene, this.world)
-          this.score += 100  // 增加分数
+          this.score += 100
+          return false
+        }
+      }
+      
+      // 检查是否击中敌人
+      for (let i = 0; i < this.enemies.length; i++) {
+        const enemy = this.enemies[i]
+        if (enemy.checkHit(projectile.mesh.position)) {
+          const isDestroyed = enemy.takeDamage(25)
+          projectile.destroy(this.scene, this.world)
+          
+          if (isDestroyed) {
+            enemy.destroy(this.scene, this.world)
+            this.enemies.splice(i, 1)
+            this.score += 500
+          }
+          return false
+        }
+      }
+      
+      // 检查炮弹是否超时
+      if (projectile.shouldRemove()) {
+        projectile.destroy(this.scene, this.world)
+        return false
+      }
+      return true
+    })
+    
+    // 更新敌人
+    if (this.playerTank) {
+      this.enemies.forEach(enemy => {
+        enemy.update(
+          deltaTime,
+          this.playerTank!.mesh.position,
+          this.scene,
+          this.world,
+          this.enemyProjectiles
+        )
+      })
+    }
+    
+    // 更新敌人炮弹
+    this.enemyProjectiles = this.enemyProjectiles.filter(projectile => {
+      projectile.update(deltaTime)
+      
+      // 检查是否击中玩家
+      if (this.playerTank) {
+        const distance = this.playerTank.mesh.position.distanceTo(projectile.mesh.position)
+        if (distance < 2.5) {
+          projectile.destroy(this.scene, this.world)
+          this.health -= 10
           return false
         }
       }

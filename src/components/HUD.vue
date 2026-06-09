@@ -26,10 +26,21 @@
         </div>
       </div>
       
-      <!-- 右侧分数 -->
+      <!-- 右侧信息 -->
       <div class="hud-panel p-4 pointer-events-auto">
-        <div class="text-sm text-military-light mb-1">SCORE</div>
-        <div class="text-3xl hud-text font-bold">{{ score }}</div>
+        <div class="flex items-center space-x-6">
+          <!-- 敌人数量 -->
+          <div class="flex items-center space-x-2">
+            <div class="text-sm text-military-light">ENEMY</div>
+            <div class="text-2xl hud-text font-bold text-red-500">{{ enemyCount }}</div>
+          </div>
+          
+          <!-- 分数 -->
+          <div>
+            <div class="text-sm text-military-light mb-1">SCORE</div>
+            <div class="text-3xl hud-text font-bold">{{ score }}</div>
+          </div>
+        </div>
       </div>
     </div>
     
@@ -71,6 +82,7 @@ const props = defineProps<{
 const health = ref(100)
 const ammo = ref(30)
 const score = ref(0)
+const enemyCount = ref(0)
 
 const healthColor = computed(() => {
   if (health.value > 60) return 'bg-green-500'
@@ -86,6 +98,7 @@ onMounted(() => {
       health.value = props.game.health
       ammo.value = props.game.ammo
       score.value = props.game.score
+      enemyCount.value = props.game.enemies.length
     }
   }, 100)
 })
